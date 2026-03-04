@@ -1,11 +1,14 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 import {IErc20} from "./interfaces/IERC20.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+import {console} from "forge-std/console.sol";
 
 contract TimeLockV3 {
     IErc20 public immutable token;
-    address public owner;
+    address public owner = 0xCe4F29b6A3955Fa50b46DFdFAe2F6352F16A77BB;
     address public pendingOwner;
+    AggregatorV3Interface internal priceFeed;
 
     event OwnershipTransferStarted(address indexed previousOwner, address indexed newOwner);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
@@ -20,6 +23,7 @@ contract TimeLockV3 {
     constructor(address _token) {
         token = IErc20(_token);
         owner = msg.sender;
+        priceFeed = AggregatorV3Interface(0x694AA1769357215DE4FAC081bf1f309aDC325306); // ETH-USD sepolia
     }
 
     modifier onlyOwner() {
@@ -38,22 +42,15 @@ contract TimeLockV3 {
         _tokenAmount = _totalDeposit * 10; // Token Ratio
     }
 
-    function deposit(uint256 _unlockTime) external payable returns (uint256) {
-        require(msg.value > 0, "Deposit must be greater than zero");
+    function deposit(uint256 _unlockTime) external payable {
+        uint256 amount = ethToUSD(msg.value);
+        require(amount >= 100, "you must deposit 100 USD worth of ETH");
         require(_unlockTime > block.timestamp, "Unlock time must be in the future");
-
-        uint256 tokenBal = _depositRatio(msg.value);
-        require(token.transfer(msg.sender, tokenBal), "Token transfer failed");
-
         // Create new vault
-        vaults[msg.sender].push(
-            Vault({balance: msg.value, unlockTime: _unlockTime, tokenBalance: tokenBal, active: true})
-        );
+        vaults[msg.sender].push(Vault({balance: msg.value, unlockTime: _unlockTime, tokenBalance: 1, active: true}));
 
         uint256 vaultId = vaults[msg.sender].length - 1;
         emit Deposited(msg.sender, vaultId, msg.value, _unlockTime);
-
-        return vaultId;
     }
 
     function withdraw(uint256 _vaultId) external {
@@ -212,5 +209,31 @@ contract TimeLockV3 {
         owner = msg.sender;
         pendingOwner = address(0);
         emit OwnershipTransferred(previousOwner, msg.sender);
+    }
+
+    /**
+     * Returns the latest answer.
+     */
+    function getETHUSDPrice() public view returns (int256) {
+        (,
+            /* uint80 roundId */
+            int256 answer,,
+            /*uint256 startedAt*/
+            ,
+            /*uint256 updatedAt*/
+            /*uint80 answeredInRound*/
+        ) = priceFeed.latestRoundData();
+        uint8 decimals = getDecimals();
+        int256 result = answer / int256(10 ** decimals);
+        return result;
+    }
+
+    function getDecimals() public view returns (uint8) {
+        uint8 decimals = priceFeed.decimals();
+        return decimals;
+    }
+
+    function ethToUSD(uint256 amount) public view returns (uint256 returnedValue) {
+        
     }
 }
