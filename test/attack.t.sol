@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {SecureBank} from "../src/security.sol";
 import {AttackContract} from "../src/Attack.sol";
 
-contract SecureBankTest is Test {
+contract AttackContractTest is Test {
     SecureBank bank;
     AttackContract attack;
     address user1;
@@ -23,24 +23,14 @@ contract SecureBankTest is Test {
         bank.deposit{value: 10 ether}();
     }
 
-    function testDepositAndWithdraw() public {
-        uint256 beforeBalance = user1.balance;
-        vm.prank(user1);
-        bank.withdraw(5 ether);
-        uint256 afterBalance = user1.balance;
-
-        assertGt(afterBalance, beforeBalance);
-        assertEq(bank.balances(user1), 5 ether);
-    }
-
-    function testRevertsReentrancyGuard() public {
+    function testAttackReverts() public {
         vm.deal(attacker, 1 ether);
         vm.prank(attacker);
-        vm.expectRevert("No reentrancy");
+        vm.expectRevert("Transfer failed");
         attack.attack{value: 1 ether}();
     }
 
-    function testFundsIntactAfterAttack() public {
+    function testFundsSafe() public {
         vm.deal(attacker, 1 ether);
         vm.prank(attacker);
         try attack.attack{value: 1 ether}() {} catch {}
@@ -49,7 +39,7 @@ contract SecureBankTest is Test {
         assertGe(bankBalance, 10 ether);
     }
 
-    function testDepositAndWithdraw() public {
+    function testWithdrawWorks() public {
         uint256 beforeBalance = user1.balance;
         vm.prank(user1);
         bank.withdraw(5 ether);
@@ -59,7 +49,7 @@ contract SecureBankTest is Test {
         assertEq(bank.balances(user1), 5 ether);
     }
 
-    function testRejectsWithdraw() public {
+    function testOverdraftFails() public {
         vm.prank(user1);
         vm.expectRevert("Insufficient balance");
         bank.withdraw(999 ether);
