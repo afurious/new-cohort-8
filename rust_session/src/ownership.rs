@@ -12,7 +12,7 @@ pub fn call_name() {
 }
 
 
-fn test_move() {
+pub fn test_move() {
     let a = String::from("Anagkazo");
     println!("{}", a.clone()); // ✅ compiles: another address has been created in memory
     let b = a;          // ownership moves from `a` to `b`
